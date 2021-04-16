@@ -84,8 +84,8 @@ void generateGaussian(std::vector<float>& K, int dim, int radius) {
    (0 <= (z) && (z) < z_size))
 
 //*** Program-wide constants ***//
-#define KERNEL_SIZE   3
-#define KERNEL_RADIUS 1 
+#define KERNEL_SIZE   7
+#define KERNEL_RADIUS 3 
 
 #define TILE_SIZE     KERNEL_SIZE
 #define CACHE_SIZE    (KERNEL_SIZE + (KERNEL_RADIUS * 2))
@@ -165,7 +165,7 @@ void performGaussian(std::vector<float>& blurred){
 	float *deviceInput;
 	float *deviceOutput;
 	
-	kDim = 3; // Kernel is square and odd in dimension, should be variable at some point
+	kDim = KERNEL_SIZE; // Kernel is square and odd in dimension, should be variable at some point
 	kRadius = floor(kDim / 2.0); // Radius of odd kernel doesn't consider middle index
 	hKernel.resize(pow(kDim, 3), 0);
 	generateGaussian(hKernel, kDim, kRadius);
