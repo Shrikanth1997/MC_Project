@@ -322,7 +322,7 @@ __global__ void createBinaryMask(float *input, float *output, const int label, c
   int zPos = bz + tz;
 
   if (inBounds(xPos, yPos, zPos)) {
-    output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = (input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label);
+    output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = (input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label)?255:0;
   }	
 
 }
@@ -412,7 +412,7 @@ int main(int argc, char** argv)
 
 
 	// Binary mask the input based on the label
-	int label = 1;
+	int label = 2;
 	blurredBinaryMask = getBinaryMask(label);
 
 
