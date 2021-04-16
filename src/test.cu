@@ -412,7 +412,7 @@ int main(int argc, char** argv)
 
 
 	// Read the input file	
-	readFile("../data/mat2.dat");
+	readFile("../data/labelsjust1.dat");
 
 	// Get all labels inside the input file
 	//std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
@@ -587,7 +587,7 @@ struct {
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount, "test_" + std::to_string(label));
+	writeFile(vertexData, vertexCount, indexData, indexCount, "labels_" + std::to_string(label));
 
 	return 0;
 
