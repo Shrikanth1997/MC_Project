@@ -83,8 +83,8 @@ void generateGaussian(std::vector<float>& K, int dim, int radius) {
    (0 <= (z) && (z) < z_size))
 
 //*** Program-wide constants ***//
-#define KERNEL_SIZE   7
-#define KERNEL_RADIUS 3
+#define KERNEL_SIZE   3
+#define KERNEL_RADIUS 1 
 
 #define TILE_SIZE     KERNEL_SIZE
 #define CACHE_SIZE    (KERNEL_SIZE + (KERNEL_RADIUS * 2))
@@ -313,16 +313,16 @@ void writeFile(float* vertex, int vertexCount, uint32_t* index, int indexCount, 
 __global__ void createBinaryMask(float *input, float *output, const int label, const int z_size, const int y_size, const int x_size) {
 
   // General Thread Info
-  int bx = blockIdx.x * TILE_SIZE; int tx = threadIdx.x;
-  int by = blockIdx.y * TILE_SIZE; int ty = threadIdx.y;
-  int bz = blockIdx.z * TILE_SIZE; int tz = threadIdx.z;
+  int bx = blockIdx.x * blockDim.x; int tx = threadIdx.x;
+  int by = blockIdx.y * blockDim.y; int ty = threadIdx.y;
+  int bz = blockIdx.z * blockDim.z; int tz = threadIdx.z;
 
   int xPos = bx + tx;
   int yPos = by + ty;
   int zPos = bz + tz;
 
   if (inBounds(xPos, yPos, zPos)) {
-    output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = (input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label)?255:0;
+    output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = (input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label);
   }	
 
 }
@@ -342,8 +342,8 @@ std::vector<float> getBinaryMask(float label){
 
 	cudaMemcpy(labeledInput, blurred.data(),  z_size * y_size * x_size * sizeof(float), cudaMemcpyHostToDevice);
 
-	dim3 dimGrid(ceil(x_size/double(TILE_SIZE)), ceil(y_size/double(TILE_SIZE)), ceil(z_size/double(TILE_SIZE)));
-    dim3 dimBlock(TILE_SIZE, TILE_SIZE, TILE_SIZE);
+	dim3 dimGrid(ceil(x_size/8), ceil(y_size/8), ceil(z_size/8));
+    dim3 dimBlock(8, 8, 8);
     createBinaryMask<<<dimGrid, dimBlock>>>(labeledInput, maskedOutput, label , z_size, y_size, x_size);
     cudaDeviceSynchronize();
 	
@@ -354,6 +354,10 @@ std::vector<float> getBinaryMask(float label){
 
 	cudaFree(labeledInput);
 	cudaFree(maskedOutput);
+
+	for(int i=0;i<binaryMaskLabel.size();i++)
+		std::cout<<"bin: "<<binaryMaskLabel[i]<<'\n';
+	
 
 	return binaryMaskLabel;
 }
@@ -412,7 +416,7 @@ int main(int argc, char** argv)
 
 
 	// Binary mask the input based on the label
-	int label = 2;
+	int label = 1;
 	blurredBinaryMask = getBinaryMask(label);
 
 
