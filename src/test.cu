@@ -12,6 +12,7 @@
 #include <cassert>
 #include <vector>
 #include <string>
+#include <set>
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -44,10 +45,11 @@ uint32_t loglevel = 4;
 
 uint3 field_size = make_uint3(60, 60, 60);
 
-//std::vector<float> scalarField_host;
 std::vector<char> scalarField_host;
 std::vector<char> scalarField_blurred;
+
 std::vector<float> blurred;
+std::vector<float> blurredBinaryMask;
 
 void readFile();
 bool readDATFile(const char* path);
@@ -55,8 +57,8 @@ bool readDATFile(const char* path);
 
 void createCharVector(){
 	
-	auto* bytes = reinterpret_cast<char*>(&blurred[0]);
-	std::vector<char> byteVec(bytes, bytes + sizeof(float) * (blurred.size()-1));
+	auto* bytes = reinterpret_cast<char*>(&blurredBinaryMask[0]);
+	std::vector<char> byteVec(bytes, bytes + sizeof(float) * (blurredBinaryMask.size()-1));
 	scalarField_blurred = byteVec;
 
 }
@@ -81,8 +83,8 @@ void generateGaussian(std::vector<float>& K, int dim, int radius) {
    (0 <= (z) && (z) < z_size))
 
 //*** Program-wide constants ***//
-#define KERNEL_SIZE   3
-#define KERNEL_RADIUS 1
+#define KERNEL_SIZE   7
+#define KERNEL_RADIUS 3
 
 #define TILE_SIZE     KERNEL_SIZE
 #define CACHE_SIZE    (KERNEL_SIZE + (KERNEL_RADIUS * 2))
@@ -162,7 +164,7 @@ void performGaussian(std::vector<float>& blurred){
 	float *deviceInput;
 	float *deviceOutput;
 	
-	kDim = 3; // Kernel is square and odd in dimension, should be variable at some point
+	kDim = 7; // Kernel is square and odd in dimension, should be variable at some point
 	kRadius = floor(kDim / 2.0); // Radius of odd kernel doesn't consider middle index
 	hKernel.resize(pow(kDim, 3), 0);
 	generateGaussian(hKernel, kDim, kRadius);
@@ -192,7 +194,8 @@ void performGaussian(std::vector<float>& blurred){
 		max = (value > max) ? value : max;
 	for (auto& value : blurred)
 		value = (value * 255) / max;
-		
+	
+	
 	cudaFree(deviceInput);
 	cudaFree(deviceOutput);
 }
@@ -200,12 +203,8 @@ void performGaussian(std::vector<float>& blurred){
 
 void setupScalarField(float*& scalar_field_d, const uint3& field_size, cudaStream_t stream)
 {
-	//const size_t N = static_cast<size_t>(field_size.x) * field_size.y * field_size.z;
-
-	readFile();
-	//readDATFile("christmastree128x124x128.dat");
-
-	performGaussian(blurred);
+	
+	performGaussian(blurredBinaryMask);
 	createCharVector();
 
 	std::cout<<"DAT file size: "<<scalarField_host.size()<<'\n';
@@ -268,9 +267,9 @@ bool readDATFile(const char* path)
 
 
 
-void readFile(){
+void readFile(std::string fileName){
 	std::ifstream file;
-	file.open("data/MC_Project/data/mat2.dat");
+	file.open(fileName);
 
 	size_t N = static_cast<size_t>(field_size.x) * field_size.y * field_size.z;
 	scalarField_host.resize(sizeof(float)*N);
@@ -295,8 +294,8 @@ void readFile(){
 
 void writeFile(float* vertex, int vertexCount, uint32_t* index, int indexCount, std::string fileName){
 	std::ofstream fileV, fileI;
-	fileV.open("data/MC_Project/data/vertices" + fileName + ".dat");
-	fileI.open("data/MC_Project/data/indices" + fileName + ".dat");
+	fileV.open("../data/vertices" + fileName + ".dat");
+	fileI.open("../data/indices" + fileName + ".dat");
 
 
 	for(int i=0;i<vertexCount;i++)
@@ -309,6 +308,57 @@ void writeFile(float* vertex, int vertexCount, uint32_t* index, int indexCount, 
 	fileV.close();
 	fileI.close();
 }
+
+
+__global__ void createBinaryMask(float *input, float *output, const int label, const int z_size, const int y_size, const int x_size) {
+
+  // General Thread Info
+  int bx = blockIdx.x * TILE_SIZE; int tx = threadIdx.x;
+  int by = blockIdx.y * TILE_SIZE; int ty = threadIdx.y;
+  int bz = blockIdx.z * TILE_SIZE; int tz = threadIdx.z;
+
+  int xPos = bx + tx;
+  int yPos = by + ty;
+  int zPos = bz + tz;
+
+  if (inBounds(xPos, yPos, zPos)) {
+    output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = (input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label);
+  }	
+
+}
+
+std::vector<float> getBinaryMask(float label){
+
+	int x_size = field_size.x;
+	int y_size = field_size.y;
+	int z_size = field_size.z;
+
+	float *labeledInput;
+	float *maskedOutput;
+
+	cudaMalloc((void**) &labeledInput,  z_size * y_size * x_size * sizeof(float));
+    cudaMalloc((void**) &maskedOutput, z_size * y_size * x_size * sizeof(float));
+
+
+	cudaMemcpy(labeledInput, blurred.data(),  z_size * y_size * x_size * sizeof(float), cudaMemcpyHostToDevice);
+
+	dim3 dimGrid(ceil(x_size/double(TILE_SIZE)), ceil(y_size/double(TILE_SIZE)), ceil(z_size/double(TILE_SIZE)));
+    dim3 dimBlock(TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    createBinaryMask<<<dimGrid, dimBlock>>>(labeledInput, maskedOutput, label , z_size, y_size, x_size);
+    cudaDeviceSynchronize();
+	
+	std::vector<float> binaryMaskLabel(z_size * x_size * y_size);
+	cudaMemcpy(binaryMaskLabel.data(), maskedOutput, z_size * y_size * x_size * sizeof(float), cudaMemcpyDeviceToHost);
+
+
+
+	cudaFree(labeledInput);
+	cudaFree(maskedOutput);
+
+	return binaryMaskLabel;
+}
+
+
 
 
 int main(int argc, char** argv)
@@ -355,11 +405,19 @@ int main(int argc, char** argv)
 
 
 	// Read the input file	
-	//readFile();
+	readFile("../data/labelsTest.dat");
+
+	// Get all labels inside the input file
+	std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
+
+
+	// Binary mask the input based on the label
+	int label = 1;
+	blurredBinaryMask = getBinaryMask(label);
+
 
 	// Set up scalar field
 	float* scalar_field_d = nullptr;
-	std::cout<<"Setup"<<'\n';
   	setupScalarField(scalar_field_d, field_size, stream);
 
 	
@@ -393,7 +451,6 @@ struct {
       bool sync;
     }
     benchmark_cases[] = {
-      //{"ix nosync", true, false},
       {"ix sync", true, true}
     };
 
@@ -448,7 +505,6 @@ struct {
 	  LOG_INFO("%12s: Allocated output buffers.", bc.name);
 
       LOG_INFO("%12s: Warming up", bc.name);
-      //for (unsigned i = 0; i < 100; i++) {
         ComputeStuff::MC::buildPN(ctx,
                                   vertex_data_d,
                                   index_data_d,
@@ -469,7 +525,6 @@ struct {
 	   	  std::cout<<"vertex count: "<<vertex_count<<'\n';
 
         }
-      //}
 
       LOG_INFO("%12s: Benchmarking", bc.name);
       auto start = std::chrono::high_resolution_clock::now();
@@ -524,7 +579,7 @@ struct {
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount, "Test");
+	writeFile(vertexData, vertexCount, indexData, indexCount, "label_" + std::to_string(label));
 
 	return 0;
 
