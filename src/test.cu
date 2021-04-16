@@ -196,9 +196,6 @@ void performGaussian(std::vector<float>& blurred){
 	for (auto& value : blurred)
 		value = (value * 255) / max;
 
-	for(int i=0;i<32;i++)
-		std::cout<<"bin: "<<blurred[i]<<'\n';
-
 	
 	cudaFree(deviceInput);
 	cudaFree(deviceOutput);
@@ -418,11 +415,15 @@ int main(int argc, char** argv)
 	readFile("../data/labelsAll.dat");
 
 	// Get all labels inside the input file
-	//std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
+	std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
+
+// Loop across the labels
+for(auto it = labels.begin();it!=labels.end();it++){
+	std::cout<<"For Labels: "<<*it<<" ----------"<<'\n';
 
 
+	float label=*it;
 	// Binary mask the input based on the label
-	int label = 3;
 	std::vector<float> temp(blurred);
 	getBinaryMask(temp, label);
 	blurredBinaryMask = temp;
@@ -593,6 +594,10 @@ struct {
 
 	LOG_ALWAYS("Writing into files....");
 	writeFile(vertexData, vertexCount, indexData, indexCount, "labels_" + std::to_string(label));
+
+	std::cout<<"---------------------------------------------------\n";
+
+	}
 
 	return 0;
 
