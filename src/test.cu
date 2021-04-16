@@ -422,7 +422,7 @@ int main(int argc, char** argv)
 
 
 	// Binary mask the input based on the label
-	int label = 1;
+	int label = 3;
 	std::vector<float> temp(blurred);
 	getBinaryMask(temp, label);
 	blurredBinaryMask = temp;
