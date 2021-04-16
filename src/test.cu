@@ -57,8 +57,8 @@ bool readDATFile(const char* path);
 
 void createCharVector(){
 	
-	auto* bytes = reinterpret_cast<char*>(&blurredBinaryMask[0]);
-	std::vector<char> byteVec(bytes, bytes + sizeof(float) * (blurredBinaryMask.size()-1));
+	auto* bytes = reinterpret_cast<char*>(&blurred[0]);
+	std::vector<char> byteVec(bytes, bytes + sizeof(float) * (blurred.size()-1));
 	scalarField_blurred = byteVec;
 
 }
@@ -204,7 +204,7 @@ void performGaussian(std::vector<float>& blurred){
 void setupScalarField(float*& scalar_field_d, const uint3& field_size, cudaStream_t stream)
 {
 	
-	performGaussian(blurredBinaryMask);
+	performGaussian(blurred);
 	createCharVector();
 
 	std::cout<<"DAT file size: "<<scalarField_host.size()<<'\n';
@@ -409,16 +409,17 @@ int main(int argc, char** argv)
 
 
 	// Read the input file	
-	readFile("../data/labelsTest.dat");
+	readFile("../data/labelsjust1.dat");
 
 	// Get all labels inside the input file
-	std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
+	//std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
 
 
 	// Binary mask the input based on the label
 	int label = 1;
-	blurredBinaryMask = getBinaryMask(label);
+	//blurredBinaryMask = getBinaryMask(label);
 
+	//blurredBinaryMask = blurred;
 
 	// Set up scalar field
 	float* scalar_field_d = nullptr;
