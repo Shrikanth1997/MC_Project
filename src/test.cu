@@ -593,7 +593,7 @@ struct {
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount, "labels_" + std::to_string(label));
+	writeFile(vertexData, vertexCount, indexData, indexCount, "labels_" + std::to_string((int)label) + "_kernel_" + std::to_string(KERNEL_SIZE));
 
 	std::cout<<"---------------------------------------------------\n";
 
