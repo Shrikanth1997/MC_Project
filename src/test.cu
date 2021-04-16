@@ -270,7 +270,7 @@ bool readDATFile(const char* path)
 
 void readFile(){
 	std::ifstream file;
-	file.open("data/MC_Project/mat2.dat");
+	file.open("data/MC_Project/data/mat2.dat");
 
 	size_t N = static_cast<size_t>(field_size.x) * field_size.y * field_size.z;
 	scalarField_host.resize(sizeof(float)*N);
@@ -293,10 +293,10 @@ void readFile(){
 }
 
 
-void writeFile(float* vertex, int vertexCount, uint32_t* index, int indexCount){
+void writeFile(float* vertex, int vertexCount, uint32_t* index, int indexCount, std::string fileName){
 	std::ofstream fileV, fileI;
-	fileV.open("data/MC_Project/verticesSp60BlurredNormalKern3thresh0.5.dat");
-	fileI.open("data/MC_Project/indicesSp60BlurredNormalKern3thresh0.5.dat");
+	fileV.open("data/MC_Project/data/vertices" + fileName + ".dat");
+	fileI.open("data/MC_Project/data/indices" + fileName + ".dat");
 
 
 	for(int i=0;i<vertexCount;i++)
@@ -353,8 +353,13 @@ int main(int argc, char** argv)
     CHECKED_CUDA(cudaMemGetInfo(&free, &total));
     LOG_INFO("CUDA memory free=%zumb total=%zumb", (free + 1024 * 1024 - 1) / (1024 * 1024), (total + 1024 * 1024 - 1) / (1024 * 1024));
 
+
+	// Read the input file	
+	//readFile();
+
 	// Set up scalar field
 	float* scalar_field_d = nullptr;
+	std::cout<<"Setup"<<'\n';
   	setupScalarField(scalar_field_d, field_size, stream);
 
 	
@@ -519,7 +524,7 @@ struct {
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount);
+	writeFile(vertexData, vertexCount, indexData, indexCount, "Test");
 
 	return 0;
 
