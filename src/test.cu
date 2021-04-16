@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 #include <cuda_gl_interop.h>
 
+#include <typeinfo>
 #include <cmath>
 #include <cassert>
 #include <vector>
@@ -57,7 +58,7 @@ bool readDATFile(const char* path);
 
 void createCharVector(){
 	
-	auto* bytes = reinterpret_cast<char*>(&blurred[0]);
+	auto* bytes = reinterpret_cast<char*>(&blurredBinaryMask[0]);
 	std::vector<char> byteVec(bytes, bytes + sizeof(float) * (blurred.size()-1));
 	scalarField_blurred = byteVec;
 
@@ -176,8 +177,8 @@ void performGaussian(std::vector<float>& blurred){
 	cudaMalloc((void**) &deviceInput,  z_size * y_size * x_size * sizeof(float));
     cudaMalloc((void**) &deviceOutput, z_size * y_size * x_size * sizeof(float));
 	
-	cudaMemcpy(deviceInput, scalarField_host.data(),  z_size * y_size * x_size * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(deviceKernel, hKernel.data(), hKernel.size() * sizeof(float), 0, cudaMemcpyHostToDevice);
+	cudaMemcpy(deviceInput, blurred.data(),  z_size * y_size * x_size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(deviceKernel, hKernel.data(), hKernel.size() * sizeof(float) , 0, cudaMemcpyHostToDevice);
 
 	dim3 dimGrid(ceil(x_size/double(TILE_SIZE)), ceil(y_size/double(TILE_SIZE)), ceil(z_size/double(TILE_SIZE)));
     dim3 dimBlock(TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -189,13 +190,13 @@ void performGaussian(std::vector<float>& blurred){
 	
 	cudaMemcpy(blurred.data(), deviceOutput, z_size * y_size * x_size * sizeof(float), cudaMemcpyDeviceToHost);
 
-	int max=0;
+	float max=0;
 	for (auto& value : blurred)
 		max = (value > max) ? value : max;
 	for (auto& value : blurred)
 		value = (value * 255) / max;
 
-	for(int i=0;i<blurred.size();i++)
+	for(int i=0;i<32;i++)
 		std::cout<<"bin: "<<blurred[i]<<'\n';
 
 	
@@ -207,7 +208,8 @@ void performGaussian(std::vector<float>& blurred){
 void setupScalarField(float*& scalar_field_d, const uint3& field_size, cudaStream_t stream)
 {
 	
-	performGaussian(blurred);
+	performGaussian(blurredBinaryMask);
+	
 	createCharVector();
 
 	std::cout<<"DAT file size: "<<scalarField_host.size()<<'\n';
@@ -217,7 +219,6 @@ void setupScalarField(float*& scalar_field_d, const uint3& field_size, cudaStrea
 	CHECKED_CUDA(cudaMalloc(&scalar_field_d, scalarField_host.size()));
 	CHECKED_CUDA(cudaMemcpyAsync(scalar_field_d, scalarField_blurred.data(), scalarField_host.size(), cudaMemcpyHostToDevice, stream));
 }
-
 
 bool readDATFile(const char* path)
   {
@@ -324,13 +325,20 @@ __global__ void createBinaryMask(float *input, float *output, const int label, c
   int yPos = by + ty;
   int zPos = bz + tz;
 
-  if (inBounds(xPos, yPos, zPos)) {
-    output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = (input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label);
-  }	
+	float ones = 1.000;
+	float zero = 0.000;
+
+  if ((xPos < (z_size)) && (yPos < (y_size)) && (zPos < (z_size))) {
+  	if(input[zPos * (y_size * x_size) + yPos * (x_size) + xPos] == label)
+    	output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = ones;
+	else
+		output[zPos * (y_size * x_size) + yPos * (x_size) + xPos] = zero;
+  }
+  __syncthreads();
 
 }
 
-std::vector<float> getBinaryMask(float label){
+void getBinaryMask(std::vector<float>& blurred, float label){
 
 	int x_size = field_size.x;
 	int y_size = field_size.y;
@@ -345,24 +353,19 @@ std::vector<float> getBinaryMask(float label){
 
 	cudaMemcpy(labeledInput, blurred.data(),  z_size * y_size * x_size * sizeof(float), cudaMemcpyHostToDevice);
 
-	dim3 dimGrid(ceil(x_size/8), ceil(y_size/8), ceil(z_size/8));
-    dim3 dimBlock(8, 8, 8);
+	//dim3 dimGrid(ceil(x_size/double(TILE_SIZE)), ceil(y_size/double(TILE_SIZE)), ceil(z_size/double(TILE_SIZE)));
+    //dim3 dimBlock(TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+	dim3 dimGrid(x_size, y_size, z_size);
+    dim3 dimBlock(1, 1, 1);
     createBinaryMask<<<dimGrid, dimBlock>>>(labeledInput, maskedOutput, label , z_size, y_size, x_size);
     cudaDeviceSynchronize();
 	
-	std::vector<float> binaryMaskLabel(z_size * x_size * y_size);
-	cudaMemcpy(binaryMaskLabel.data(), maskedOutput, z_size * y_size * x_size * sizeof(float), cudaMemcpyDeviceToHost);
-
+	cudaMemcpy(blurred.data(), maskedOutput, z_size * y_size * x_size * sizeof(float), cudaMemcpyDeviceToHost);
 
 
 	cudaFree(labeledInput);
 	cudaFree(maskedOutput);
-
-	for(int i=0;i<binaryMaskLabel.size();i++)
-		std::cout<<"bin: "<<binaryMaskLabel[i]<<'\n';
-	
-
-	return binaryMaskLabel;
 }
 
 
@@ -412,7 +415,7 @@ int main(int argc, char** argv)
 
 
 	// Read the input file	
-	readFile("../data/labelsjust1.dat");
+	readFile("../data/labelsAll.dat");
 
 	// Get all labels inside the input file
 	//std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
@@ -420,7 +423,9 @@ int main(int argc, char** argv)
 
 	// Binary mask the input based on the label
 	int label = 1;
-	//blurredBinaryMask = getBinaryMask(label);
+	std::vector<float> temp(blurred);
+	getBinaryMask(temp, label);
+	blurredBinaryMask = temp;
 
 	//blurredBinaryMask = blurred;
 
