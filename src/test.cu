@@ -164,7 +164,7 @@ void performGaussian(std::vector<float>& blurred){
 	float *deviceInput;
 	float *deviceOutput;
 	
-	kDim = 7; // Kernel is square and odd in dimension, should be variable at some point
+	kDim = 3; // Kernel is square and odd in dimension, should be variable at some point
 	kRadius = floor(kDim / 2.0); // Radius of odd kernel doesn't consider middle index
 	hKernel.resize(pow(kDim, 3), 0);
 	generateGaussian(hKernel, kDim, kRadius);
@@ -194,7 +194,10 @@ void performGaussian(std::vector<float>& blurred){
 		max = (value > max) ? value : max;
 	for (auto& value : blurred)
 		value = (value * 255) / max;
-	
+
+	for(int i=0;i<blurred.size();i++)
+		std::cout<<"bin: "<<blurred[i]<<'\n';
+
 	
 	cudaFree(deviceInput);
 	cudaFree(deviceOutput);
@@ -409,7 +412,7 @@ int main(int argc, char** argv)
 
 
 	// Read the input file	
-	readFile("../data/labelsjust1.dat");
+	readFile("../data/mat2.dat");
 
 	// Get all labels inside the input file
 	//std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
@@ -584,7 +587,7 @@ struct {
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount, "label_" + std::to_string(label));
+	writeFile(vertexData, vertexCount, indexData, indexCount, "test_" + std::to_string(label));
 
 	return 0;
 
