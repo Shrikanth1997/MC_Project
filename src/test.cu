@@ -577,8 +577,8 @@ struct {
 
       LOG_INFO("Getting Mesh");
       ComputeStuff::MC::buildPN(ctx,
-                                  vertex_data_d + 6*vertexOffset[i],
-                                  index_data_d + indexOffset[i],
+                                  vertex_data_d + (6*vertexOffset[i]),
+                                  index_data_d + (indexOffset[i]),
                                   6 * sizeof(float) * vertex_count,
                                   sizeof(uint32_t) * index_count,
                                   field_size.x,
