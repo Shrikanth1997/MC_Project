@@ -417,8 +417,17 @@ int main(int argc, char** argv)
 	// Get all labels inside the input file
 	std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
 
-// Loop across the labels
-for(auto it = labels.begin();it!=labels.end();it++){
+	auto* tables = ComputeStuff::MC::createTables(stream);
+
+	auto* ctx = createContext(tables, field_size, true, stream);
+		
+	// Loop across the labels
+	int offset = 0;
+	int vertexSum=0, indexSum=0;
+	std::vector<long> vertexOffset(1,0);
+	std::vector<long> indexOffset(1,0);
+
+for(auto it = labels.begin();it!=labels.end();it++, offset++){
 	std::cout<<"For Labels: "<<*it<<" ----------"<<'\n';
 
 
@@ -450,15 +459,7 @@ for(auto it = labels.begin();it!=labels.end();it++){
     LOG_INFO("CUDA memory free=%zumb total=%zumb", (free + 1024 * 1024 - 1) / (1024 * 1024), (total + 1024 * 1024 - 1) / (1024 * 1024));
 
 
-
-	auto* tables = ComputeStuff::MC::createTables(stream);
-
-	float* vertexData = nullptr;
-	int vertexCount=0;
-
-	uint32_t* indexData = nullptr;
-	int indexCount=0;
-
+	
 struct {
       const char* name;
       bool indexed;
@@ -472,7 +473,8 @@ struct {
 #ifdef USE_NVTOOLS_EXT
       nvtxRangePush(bc.name);
 #endif
-      auto* ctx = createContext(tables, field_size, true, stream);
+ 
+ 	  auto* ctx = createContext(tables, field_size, true, stream);
       LOG_INFO("%12s: Created context.", bc.name);
       LOG_INFO("Grid size [%u x %u x %u]", ctx->grid_size.x, ctx->grid_size.y, ctx->grid_size.z);
       LOG_INFO("Chunks [%u x %u x %u] (= %u) cover=[%u x %u x %u]",
@@ -484,6 +486,7 @@ struct {
       }
       LOG_INFO("Total %d, levels %d", ctx->total_size, ctx->levels);
 
+     
       // Run with no output buffers to get size of output.
       ComputeStuff::MC::buildPN(ctx,
                                 nullptr,
@@ -502,26 +505,80 @@ struct {
       uint32_t vertex_count = 0;
       uint32_t index_count = 0;
       ComputeStuff::MC::getCounts(ctx, &vertex_count, &index_count, stream);
-	std::cout<<"index count: "<<index_count<<'\n';
-	   	  std::cout<<"vertex count: "<<vertex_count<<'\n';
+	  std::cout<<"index count: "<<index_count<<'\n';
+	  std::cout<<"vertex count: "<<vertex_count<<'\n';
 
-	 float* vertexDataH = (float*)calloc(0,sizeof(float)*6 * vertex_count);
-	 uint32_t* indexDataH = (uint32_t*)calloc(0,sizeof(float)* index_count);
+	  vertexSum += vertex_count;
+	  indexSum += index_count;
+	  vertexOffset.push_back(vertexSum);
+	  indexOffset.push_back(indexSum);
+	  }
+	 }
       
 	  float* vertex_data_d = nullptr;
-      CHECKED_CUDA(cudaMalloc(&vertex_data_d, 6 * sizeof(float) * vertex_count));
-	  //CHECKED_CUDA(cudaMemcpy(vertex_data_d, vertexDataH, sizeof(float)*6 * vertex_count, cudaMemcpyHostToDevice));
+      CHECKED_CUDA(cudaMalloc(&vertex_data_d, 6 * sizeof(float) * vertexOffset[vertexOffset.size()-1]));
       
 	  uint32_t* index_data_d = nullptr;
-      CHECKED_CUDA(cudaMalloc(&index_data_d, sizeof(uint32_t)* index_count));
-	  //CHECKED_CUDA(cudaMemcpy(index_data_d, indexDataH, sizeof(uint32_t)* index_count, cudaMemcpyHostToDevice));
+      CHECKED_CUDA(cudaMalloc(&index_data_d, sizeof(uint32_t)* indexOffset[indexOffset.size()-1]));
       
-	  LOG_INFO("%12s: Allocated output buffers.", bc.name);
+	  LOG_INFO("Allocated output buffers.");
 
-      LOG_INFO("%12s: Warming up", bc.name);
-        ComputeStuff::MC::buildPN(ctx,
-                                  vertex_data_d,
-                                  index_data_d,
+int i=0;
+for(auto it = labels.begin();it!=labels.end();it++, i++){
+	std::cout<<"For Labels: "<<*it<<" ----------"<<'\n';
+
+
+	float label=*it;
+	// Binary mask the input based on the label
+	std::vector<float> temp(blurred);
+	getBinaryMask(temp, label);
+	blurredBinaryMask = temp;
+
+	//blurredBinaryMask = blurred;
+
+	// Set up scalar field
+	float* scalar_field_d = nullptr;
+  	setupScalarField(scalar_field_d, field_size, stream);
+	LOG_INFO("Built scalar field");
+
+    CHECKED_CUDA(cudaMemGetInfo(&free, &total));
+    LOG_INFO("CUDA memory free=%zumb total=%zumb", (free + 1024 * 1024 - 1) / (1024 * 1024), (total + 1024 * 1024 - 1) / (1024 * 1024));
+
+
+	
+struct {
+      const char* name;
+      bool indexed;
+      bool sync;
+    }
+    benchmark_cases[] = {
+      {"ix sync", true, true}
+    };
+
+    for (auto& bc : benchmark_cases) {
+#ifdef USE_NVTOOLS_EXT
+      nvtxRangePush(bc.name);
+#endif
+	 
+      LOG_INFO("%12s: Created context.", bc.name);
+      LOG_INFO("Grid size [%u x %u x %u]", ctx->grid_size.x, ctx->grid_size.y, ctx->grid_size.z);
+      LOG_INFO("Chunks [%u x %u x %u] (= %u) cover=[%u x %u x %u]",
+              ctx->chunks.x, ctx->chunks.y, ctx->chunks.z, ctx->chunk_total,
+              31 * ctx->chunks.x, 5 * ctx->chunks.y, 5 * ctx->chunks.z);
+      LOG_INFO("Level vec4-offset  vec4-size  (    size)");
+      for (unsigned l = 0; l < ctx->levels; l++) {
+        LOG_INFO("[%2d] %12d %10d  (%8d)", l, ctx->level_offsets[l], ctx->level_sizes[l], 4 * ctx->level_sizes[l]);
+      }
+      LOG_INFO("Total %d, levels %d", ctx->total_size, ctx->levels);
+
+
+	  uint32_t vertex_count = vertexOffset[i+1] - vertexOffset[i];
+      uint32_t index_count = indexOffset[i+1] - indexOffset[i];
+
+      LOG_INFO("Getting Mesh");
+      ComputeStuff::MC::buildPN(ctx,
+                                  vertex_data_d + vertexOffset[i],
+                                  index_data_d + indexOffset[i],
                                   6 * sizeof(float) * vertex_count,
                                   sizeof(uint32_t) * index_count,
                                   field_size.x,
@@ -539,9 +596,11 @@ struct {
 	   	  std::cout<<"vertex count: "<<vertex_count<<'\n';
 
         }
+#ifdef USE_NVTOOLS_EXT
+      nvtxRangePop();
+#endif
 
-      LOG_INFO("%12s: Benchmarking", bc.name);
-      auto start = std::chrono::high_resolution_clock::now();
+	  auto start = std::chrono::high_resolution_clock::now();
       double elapsed = 0.f;
       float cuda_ms = 0.f;
       unsigned iterations = 0;
@@ -558,15 +617,25 @@ struct {
               (free + 1024 * 1024 - 1) / (1024 * 1024),
               (total + 1024 * 1024 - 1) / (1024 * 1024));
 
+    	}
+	}
 
-	 vertexCount = 6*vertex_count;
+
+      
+	float* vertexData = nullptr;
+	int vertexCount=0;
+
+	uint32_t* indexData = nullptr;
+	int indexCount=0;
+
+	 vertexCount = 6*vertexOffset[vertexOffset.size()-1];
 	 vertexData = (float*)malloc(sizeof(float) * vertexCount);
 	 cudaError_t e = cudaMemcpy((void*)vertexData, vertex_data_d, sizeof(float) * vertexCount, cudaMemcpyDeviceToHost);
 	 std::cout<<"Vertex data memcpy error: "<<cudaGetErrorString(e)<<'\n';
 
 
-	indexData = (uint32_t*)malloc(sizeof(uint32_t)*index_count);
-	indexCount = index_count;
+	indexCount = indexOffset[indexOffset.size()-1];
+	indexData = (uint32_t*)malloc(sizeof(uint32_t)*indexCount);
 	 e = cudaMemcpy((void*)indexData, index_data_d, sizeof(uint32_t)*indexCount, cudaMemcpyDeviceToHost);
 	 std::cout<<"Index Data memcpy error: "<<cudaGetErrorString(e)<<'\n';
 
@@ -577,27 +646,22 @@ struct {
 	  CHECKED_CUDA(cudaFree(vertex_data_d));
       CHECKED_CUDA(cudaFree(index_data_d));
 
-      CHECKED_CUDA(cudaMemGetInfo(&free, &total));
+      /*CHECKED_CUDA(cudaMemGetInfo(&free, &total));
       LOG_INFO("%12s: Released resources free=%zumb total=%zumb", bc.name, (free + 1024 * 1024 - 1) / (1024 * 1024), (total + 1024 * 1024 - 1) / (1024 * 1024));
-#ifdef USE_NVTOOLS_EXT
-      nvtxRangePop();
-#endif
-    }
-
     LOG_ALWAYS("Exiting...");
     CHECKED_CUDA(cudaMemGetInfo(&free, &total));
-    LOG_INFO("CUDA memory free=%zumb total=%zumb", (free + 1024 * 1024 - 1) / (1024 * 1024), (total + 1024 * 1024 - 1) / (1024 * 1024));
+    LOG_INFO("CUDA memory free=%zumb total=%zumb", (free + 1024 * 1024 - 1) / (1024 * 1024), (total + 1024 * 1024 - 1) / (1024 * 1024));*/
     
 
 	std::cout<<"index count: "<<indexCount<<'\n';
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount, "labels_" + std::to_string((int)label) + "_kernel_" + std::to_string(KERNEL_SIZE));
+	writeFile(vertexData, vertexCount, indexData, indexCount, "FULL_kernel_" +  std::to_string(KERNEL_SIZE));
 
 	std::cout<<"---------------------------------------------------\n";
 
-	}
+	
 
 	return 0;
 
