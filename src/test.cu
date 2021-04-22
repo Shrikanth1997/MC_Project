@@ -510,8 +510,8 @@ struct {
 
 	  vertexSum += vertex_count;
 	  indexSum += index_count;
-	  vertexOffset.push_back(vertexSum);
-	  indexOffset.push_back(indexSum);
+	  vertexOffset.push_back(vertexSum-1);
+	  indexOffset.push_back(indexSum-1);
 	  }
 	 }
       
@@ -577,7 +577,7 @@ struct {
 
       LOG_INFO("Getting Mesh");
       ComputeStuff::MC::buildPN(ctx,
-                                  vertex_data_d + vertexOffset[i],
+                                  vertex_data_d + 6*vertexOffset[i],
                                   index_data_d + indexOffset[i],
                                   6 * sizeof(float) * vertex_count,
                                   sizeof(uint32_t) * index_count,
