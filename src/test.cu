@@ -510,8 +510,8 @@ struct {
 
 	  vertexSum += vertex_count;
 	  indexSum += index_count;
-	  vertexOffset.push_back(vertexSum-1);
-	  indexOffset.push_back(indexSum-1);
+	  vertexOffset.push_back(vertexSum);
+	  indexOffset.push_back(indexSum);
 	  }
 	 }
       
