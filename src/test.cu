@@ -575,9 +575,12 @@ struct {
 	  uint32_t vertex_count = vertexOffset[i+1] - vertexOffset[i];
       uint32_t index_count = indexOffset[i+1] - indexOffset[i];
 
+	std::cout<<"ACTUAL VERTEX Size: " << vertex_count << " Pos: " << 6*vertexOffset[i] << '\n';
+	std::cout<<"ACTUAL INDEX Size: " << index_count << " Pos: " << indexOffset[i] << '\n';
+
       LOG_INFO("Getting Mesh");
       ComputeStuff::MC::buildPN(ctx,
-                                  vertex_data_d + (6*vertexOffset[i]),
+                                  vertex_data_d + (vertexOffset[i]*6),
                                   index_data_d + (indexOffset[i]),
                                   6 * sizeof(float) * vertex_count,
                                   sizeof(uint32_t) * index_count,
@@ -628,7 +631,7 @@ struct {
 	uint32_t* indexData = nullptr;
 	int indexCount=0;
 
-	 vertexCount = 6*vertexOffset[vertexOffset.size()-1];
+	 vertexCount = (6*vertexOffset[vertexOffset.size()-1]);
 	 vertexData = (float*)malloc(sizeof(float) * vertexCount);
 	 cudaError_t e = cudaMemcpy((void*)vertexData, vertex_data_d, sizeof(float) * vertexCount, cudaMemcpyDeviceToHost);
 	 std::cout<<"Vertex data memcpy error: "<<cudaGetErrorString(e)<<'\n';
@@ -638,6 +641,13 @@ struct {
 	indexData = (uint32_t*)malloc(sizeof(uint32_t)*indexCount);
 	 e = cudaMemcpy((void*)indexData, index_data_d, sizeof(uint32_t)*indexCount, cudaMemcpyDeviceToHost);
 	 std::cout<<"Index Data memcpy error: "<<cudaGetErrorString(e)<<'\n';
+
+	for(int i=0, k=1;i<indexCount;i++){
+		if(i<indexOffset[k])
+			indexData[i] += vertexOffset[k-1];
+		else
+			indexData[i] += vertexOffset[k++];
+	}
 
 
 	  freeContext(ctx, stream);
