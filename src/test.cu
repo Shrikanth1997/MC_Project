@@ -4,8 +4,8 @@
 //#include <../../v11.2/nvToolsExt.h> 
 //#endif
 #include <cuda_runtime_api.h>
-#include <glad/gl.h>
-#include <GLFW/glfw3.h>
+//#include <glad/gl.h>
+//#include <GLFW/glfw3.h>
 #include <cuda_gl_interop.h>
 
 #include <typeinfo>
