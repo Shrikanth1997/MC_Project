@@ -1,8 +1,8 @@
 #define USE_NVTOOLS_EXT
 
-#ifdef USE_NVTOOLS_EXT
-#include <nvToolsExt.h> 
-#endif
+//#ifdef USE_NVTOOLS_EXT
+//#include <../../v11.2/nvToolsExt.h> 
+//#endif
 #include <cuda_runtime_api.h>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -470,9 +470,9 @@ struct {
     };
 
     for (auto& bc : benchmark_cases) {
-#ifdef USE_NVTOOLS_EXT
-      nvtxRangePush(bc.name);
-#endif
+//#ifdef USE_NVTOOLS_EXT
+//      nvtxRangePush(bc.name);
+//#endif
  
  	  auto* ctx = createContext(tables, field_size, true, stream);
       LOG_INFO("%12s: Created context.", bc.name);
@@ -556,9 +556,9 @@ struct {
     };
 
     for (auto& bc : benchmark_cases) {
-#ifdef USE_NVTOOLS_EXT
-      nvtxRangePush(bc.name);
-#endif
+//#ifdef USE_NVTOOLS_EXT
+//      nvtxRangePush(bc.name);
+//#endif
 	 
       LOG_INFO("%12s: Created context.", bc.name);
       LOG_INFO("Grid size [%u x %u x %u]", ctx->grid_size.x, ctx->grid_size.y, ctx->grid_size.z);
@@ -599,9 +599,9 @@ struct {
 	   	  std::cout<<"vertex count: "<<vertex_count<<'\n';
 
         }
-#ifdef USE_NVTOOLS_EXT
-      nvtxRangePop();
-#endif
+//#ifdef USE_NVTOOLS_EXT
+//      nvtxRangePop();
+//#endif
 
 	  auto start = std::chrono::high_resolution_clock::now();
       double elapsed = 0.f;
