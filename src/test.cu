@@ -44,7 +44,7 @@ uint32_t loglevel = 4;
   }
 
 
-uint3 field_size = make_uint3(60, 60, 60);
+uint3 field_size = make_uint3(166, 209, 223);
 
 std::vector<char> scalarField_host;
 std::vector<char> scalarField_blurred;
@@ -412,7 +412,15 @@ int main(int argc, char** argv)
 
 
 	// Read the input file	
-	readFile("../data/labelsAll.dat");
+	readFile("../data/atlas.dat");
+
+   using std::chrono::high_resolution_clock;
+    using std::chrono::duration_cast;
+    using std::chrono::duration;
+    using std::chrono::milliseconds;
+
+    auto t1 = high_resolution_clock::now();
+
 
 	// Get all labels inside the input file
 	std::set<float, std::less<float>> labels(blurred.begin(), blurred.end());
@@ -666,8 +674,19 @@ struct {
 	std::cout<<"index count: "<<indexCount<<'\n';
 	std::cout<<"vertex count: "<<vertexCount<<'\n';
 
+	auto t2 = high_resolution_clock::now();
+
+    /* Getting number of milliseconds as an integer. */
+    auto ms_int = duration_cast<milliseconds>(t2 - t1);
+
+    /* Getting number of milliseconds as a double. */
+    duration<double, std::milli> ms_double = t2 - t1;
+
+    std::cout << "Time to derive the mesh: " << ms_int.count() << "ms\n";
+    std::cout << "Time to derive the mesh: " << ms_double.count() << "ms";
+
 	LOG_ALWAYS("Writing into files....");
-	writeFile(vertexData, vertexCount, indexData, indexCount, "FULL_kernel_" +  std::to_string(KERNEL_SIZE));
+	writeFile(vertexData, vertexCount, indexData, indexCount, "ATLAS_kernel_" +  std::to_string(KERNEL_SIZE));
 
 	std::cout<<"---------------------------------------------------\n";
 
