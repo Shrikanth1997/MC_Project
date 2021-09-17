@@ -1,7 +1,6 @@
 Basic usage:
 
-Run makein src/ 
-And then ./ts
+Run make in src/ and then ./ts
 
 Matlab:
 View the Matlab source files in the MatlabSrc folder
