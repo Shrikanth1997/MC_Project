@@ -43,7 +43,7 @@ uint32_t loglevel = 4;
     exit(EXIT_FAILURE);
   }
 
-
+// Dimensions of the Volume matrix
 uint3 field_size = make_uint3(166, 209, 223);
 
 std::vector<char> scalarField_host;
@@ -55,7 +55,7 @@ std::vector<float> blurredBinaryMask;
 void readFile();
 bool readDATFile(const char* path);
 
-
+// Convert vector into char vector
 void createCharVector(){
 	
 	auto* bytes = reinterpret_cast<char*>(&blurredBinaryMask[0]);
@@ -153,7 +153,7 @@ __global__ void conv3d(float *input, float *output,
   }
 }
 
-
+// Gaussian blurring on the input vector
 void performGaussian(std::vector<float>& blurred){
 	std::vector<float> hKernel;
 	
@@ -201,7 +201,7 @@ void performGaussian(std::vector<float>& blurred){
 	cudaFree(deviceOutput);
 }
 
-
+// Copying the input scalar field into CUDA
 void setupScalarField(float*& scalar_field_d, const uint3& field_size, cudaStream_t stream)
 {
 	
@@ -217,6 +217,7 @@ void setupScalarField(float*& scalar_field_d, const uint3& field_size, cudaStrea
 	CHECKED_CUDA(cudaMemcpyAsync(scalar_field_d, scalarField_blurred.data(), scalarField_host.size(), cudaMemcpyHostToDevice, stream));
 }
 
+// Read binary file
 bool readDATFile(const char* path)
   {
     assert(path);
@@ -266,8 +267,7 @@ bool readDATFile(const char* path)
   }
 
 
-
-
+// Read file (Files generated from Matlab are character files)
 void readFile(std::string fileName){
 	std::ifstream file;
 	file.open(fileName);
@@ -292,7 +292,7 @@ void readFile(std::string fileName){
 	
 }
 
-
+// Write into file
 void writeFile(float* vertex, int vertexCount, uint32_t* index, int indexCount, std::string fileName){
 	std::ofstream fileV, fileI;
 	fileV.open("../data/vertices" + fileName + ".dat");
